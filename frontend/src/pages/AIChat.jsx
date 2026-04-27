@@ -45,11 +45,12 @@ export default function AIChat() {
         time: new Date(),
         action: resp.action
       }])
-    } catch {
+    } catch (e) {
+      const detail = e?.response?.data?.detail || e?.message || 'Неизвестная ошибка'
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'assistant',
-        text: '⚠️ Не удалось получить ответ. Проверь подключение к серверу.',
+        text: `⚠️ Ошибка: ${detail}`,
         time: new Date()
       }])
     } finally {

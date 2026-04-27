@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
-MISTRAL_MODEL = "mistral-medium-latest"
+MISTRAL_MODEL = "mistral-small-latest"
 
 SYSTEM_PROMPT = """Ты финансовый ИИ-ассистент приложения "Finansi". Ты помогаешь пользователям управлять личными финансами, анализировать расходы и доходы, давать советы по финансовой грамотности.
 
@@ -61,7 +61,9 @@ async def chat_with_ai(message: str, user_summary: str, recent_transactions: str
             },
             json=payload
         )
-        response.raise_for_status()
+        if response.status_code != 200:
+            error_body = response.text
+            raise ValueError(f"Mistral API вернул {response.status_code}: {error_body}")
         data = response.json()
 
     raw_reply = data["choices"][0]["message"]["content"]
