@@ -23,36 +23,33 @@ export default function AIChat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef(null)
-  const inputRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const send = async (text) => {
-    const msg = text || input.trim()
+    const msg = (text || input).trim()
     if (!msg || loading) return
 
     setInput('')
-    const userMsg = { id: Date.now(), role: 'user', text: msg, time: new Date() }
-    setMessages(prev => [...prev, userMsg])
+    setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: msg, time: new Date() }])
     setLoading(true)
 
     try {
       const resp = await sendAIMessage(msg)
-      const aiMsg = {
+      setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'assistant',
         text: resp.reply,
         time: new Date(),
         action: resp.action
-      }
-      setMessages(prev => [...prev, aiMsg])
-    } catch (e) {
+      }])
+    } catch {
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'assistant',
-        text: '⚠️ Не удалось получить ответ. Проверь подключение к интернету.',
+        text: '⚠️ Не удалось получить ответ. Проверь подключение к серверу.',
         time: new Date()
       }])
     } finally {
@@ -68,11 +65,19 @@ export default function AIChat() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',          /* заполняет всё выделенное пространство */
+      overflow: 'hidden',
+      minHeight: 0
+    }}>
+
+      {/* ── Шапка ── */}
       <div style={{
-        padding: '20px 20px 16px',
-        background: 'linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%)',
+        padding: '16px 20px 12px',
+        background: 'var(--bg-secondary)',
+        borderBottom: '1px solid var(--border)',
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -82,15 +87,13 @@ export default function AIChat() {
             border: '1px solid rgba(139,92,246,0.3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 22, flexShrink: 0
-          }}>
-            🤖
-          </div>
+          }}>🤖</div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>ИИ Ассистент</div>
             <div style={{ fontSize: 12, color: 'var(--income)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{
                 display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
-                background: 'var(--income)', animation: 'pulse 2s infinite'
+                background: 'var(--income)'
               }}/>
               Онлайн · Mistral AI
             </div>
@@ -98,18 +101,24 @@ export default function AIChat() {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* ── Сообщения — скролл ── */}
       <div style={{
-        flex: 1, overflowY: 'auto', padding: '0 16px',
-        display: 'flex', flexDirection: 'column', gap: 10
+        flex: 1,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        padding: '12px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        minHeight: 0
       }}>
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {messages.map(msg => (
             <motion.div
               key={msg.id}
               initial={{ opacity: 0, y: 12, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
               style={{
                 display: 'flex',
                 justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
@@ -119,13 +128,11 @@ export default function AIChat() {
             >
               {msg.role === 'assistant' && (
                 <div style={{
-                  width: 30, height: 30, borderRadius: 10,
+                  width: 28, height: 28, borderRadius: 9,
                   background: 'linear-gradient(135deg, #8B5CF6, #10D9A0)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, flexShrink: 0, alignSelf: 'flex-end'
-                }}>
-                  🤖
-                </div>
+                  fontSize: 13, flexShrink: 0
+                }}>🤖</div>
               )}
               <div style={{ maxWidth: '78%' }}>
                 <div style={{
@@ -134,7 +141,7 @@ export default function AIChat() {
                     : 'var(--bg-card)',
                   color: 'var(--text-primary)',
                   borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                  padding: '12px 16px',
+                  padding: '11px 15px',
                   fontSize: 14,
                   lineHeight: 1.5,
                   border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
@@ -157,9 +164,7 @@ export default function AIChat() {
                       fontSize: 12, display: 'flex', alignItems: 'center', gap: 8
                     }}
                   >
-                    <span>
-                      {msg.action.data.type === 'income' ? '✅ Доход добавлен' : '✅ Расход добавлен'}
-                    </span>
+                    <span>{msg.action.data.type === 'income' ? '✅ Доход добавлен' : '✅ Расход добавлен'}</span>
                     <span style={{ fontWeight: 700, color: msg.action.data.type === 'income' ? '#10D9A0' : '#FF5757' }}>
                       {new Intl.NumberFormat('ru-RU').format(msg.action.data.amount)} ₽
                     </span>
@@ -168,7 +173,8 @@ export default function AIChat() {
                 )}
                 <div style={{
                   fontSize: 10, color: 'var(--text-muted)',
-                  marginTop: 4, textAlign: msg.role === 'user' ? 'right' : 'left',
+                  marginTop: 4,
+                  textAlign: msg.role === 'user' ? 'right' : 'left',
                   paddingLeft: msg.role === 'assistant' ? 4 : 0,
                   paddingRight: msg.role === 'user' ? 4 : 0
                 }}>
@@ -179,23 +185,23 @@ export default function AIChat() {
           ))}
         </AnimatePresence>
 
-        {/* Typing indicator */}
+        {/* Индикатор печати */}
         {loading && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             style={{ display: 'flex', alignItems: 'center', gap: 8 }}
           >
             <div style={{
-              width: 30, height: 30, borderRadius: 10,
+              width: 28, height: 28, borderRadius: 9,
               background: 'linear-gradient(135deg, #8B5CF6, #10D9A0)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13
             }}>🤖</div>
             <div style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
               borderRadius: '18px 18px 18px 4px',
-              padding: '12px 16px',
+              padding: '11px 15px',
               display: 'flex', gap: 4, alignItems: 'center'
             }}>
               {[0, 1, 2].map(i => (
@@ -209,11 +215,10 @@ export default function AIChat() {
             </div>
           </motion.div>
         )}
-
         <div ref={bottomRef} />
       </div>
 
-      {/* Suggestions */}
+      {/* ── Подсказки ── */}
       <AnimatePresence>
         {messages.length <= 2 && !loading && (
           <motion.div
@@ -221,9 +226,10 @@ export default function AIChat() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             style={{
-              padding: '8px 16px',
+              flexShrink: 0,
+              padding: '6px 16px',
               display: 'flex', gap: 8, overflowX: 'auto',
-              flexShrink: 0
+              borderTop: '1px solid var(--border)'
             }}
           >
             {SUGGESTIONS.map((s, i) => (
@@ -233,15 +239,14 @@ export default function AIChat() {
                 onClick={() => send(s)}
                 style={{
                   flexShrink: 0,
-                  padding: '8px 12px',
+                  padding: '7px 12px',
                   borderRadius: 12,
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border)',
                   color: 'var(--text-secondary)',
                   fontSize: 12, cursor: 'pointer',
                   fontFamily: 'inherit',
-                  whiteSpace: 'nowrap',
-                  maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis'
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {s}
@@ -251,17 +256,16 @@ export default function AIChat() {
         )}
       </AnimatePresence>
 
-      {/* Input */}
+      {/* ── Инпут — прибит к низу ── */}
       <div style={{
-        padding: '12px 16px',
-        background: 'rgba(19,19,42,0.95)',
+        flexShrink: 0,
+        padding: '10px 14px',
+        background: 'rgba(19,19,42,0.98)',
         backdropFilter: 'blur(20px)',
         borderTop: '1px solid var(--border)',
-        display: 'flex', gap: 10, alignItems: 'flex-end',
-        flexShrink: 0
+        display: 'flex', gap: 10, alignItems: 'flex-end'
       }}>
         <textarea
-          ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -275,7 +279,7 @@ export default function AIChat() {
             padding: '12px 16px',
             color: 'var(--text-primary)',
             fontFamily: 'inherit',
-            fontSize: 14,
+            fontSize: 16,       /* >= 16px — зум не срабатывает */
             outline: 'none',
             resize: 'none',
             maxHeight: 100,

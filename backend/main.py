@@ -1,10 +1,10 @@
+from dotenv import load_dotenv
+load_dotenv()  # must be before all other imports so env vars are available
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from routes import users, transactions, categories, analytics, ai_chat, export_routes
-from dotenv import load_dotenv
-
-load_dotenv()
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Finansi API", version="1.0.0")

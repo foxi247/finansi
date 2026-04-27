@@ -2,12 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getCategories, createTransaction } from '../api/client'
 
-function formatDisplay(val) {
-  const num = parseFloat(val)
-  if (isNaN(num)) return '0'
-  return new Intl.NumberFormat('ru-RU').format(num)
-}
-
 export default function AddTransaction({ onTabChange }) {
   const [type, setType] = useState('expense')
   const [amount, setAmount] = useState('')
@@ -17,7 +11,6 @@ export default function AddTransaction({ onTabChange }) {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
-  const inputRef = useRef(null)
 
   useEffect(() => {
     getCategories(type).then(cats => {
@@ -26,19 +19,14 @@ export default function AddTransaction({ onTabChange }) {
     })
   }, [type])
 
-  const handleDigit = (d) => {
-    if (d === '.' && amount.includes('.')) return
-    if (d === '.' && amount === '') { setAmount('0.'); return }
-    setAmount(prev => {
-      const next = prev + d
-      const [int, dec] = next.split('.')
-      if (dec !== undefined && dec.length > 2) return prev
-      if (int.replace(/^0+/, '').length > 9) return prev
-      return next
-    })
+  const handleAmountChange = (e) => {
+    const val = e.target.value
+    // только цифры и одна точка
+    if (/^\d*\.?\d{0,2}$/.test(val)) {
+      setAmount(val)
+      setError('')
+    }
   }
-
-  const handleBackspace = () => setAmount(prev => prev.slice(0, -1))
 
   const handleSubmit = async () => {
     const num = parseFloat(amount)
@@ -73,45 +61,43 @@ export default function AddTransaction({ onTabChange }) {
   return (
     <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Новая операция</h2>
+      <h2 style={{ fontSize: 22, fontWeight: 800 }}>Новая операция</h2>
 
-        {/* Type Toggle */}
-        <div style={{
-          display: 'flex',
-          background: 'var(--bg-card)',
-          borderRadius: 16,
-          padding: 4,
-          border: '1px solid var(--border)'
-        }}>
-          {[
-            { key: 'expense', label: '↓ Расход', color: '#FF5757' },
-            { key: 'income', label: '↑ Доход', color: '#10D9A0' }
-          ].map(({ key, label, color }) => (
-            <motion.button
-              key={key}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setType(key)}
-              style={{
-                flex: 1, padding: '12px 8px',
-                borderRadius: 12, border: 'none',
-                background: type === key
-                  ? `linear-gradient(135deg, ${color}22, ${color}11)`
-                  : 'transparent',
-                color: type === key ? color : 'var(--text-muted)',
-                fontWeight: type === key ? 700 : 400,
-                fontSize: 15, cursor: 'pointer', fontFamily: 'inherit',
-                transition: 'all 0.2s',
-                boxShadow: type === key ? `0 0 0 1px ${color}40` : 'none'
-              }}
-            >
-              {label}
-            </motion.button>
-          ))}
-        </div>
+      {/* Type Toggle */}
+      <div style={{
+        display: 'flex',
+        background: 'var(--bg-card)',
+        borderRadius: 16,
+        padding: 4,
+        border: '1px solid var(--border)'
+      }}>
+        {[
+          { key: 'expense', label: '↓ Расход', color: '#FF5757' },
+          { key: 'income', label: '↑ Доход', color: '#10D9A0' }
+        ].map(({ key, label, color }) => (
+          <motion.button
+            key={key}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setType(key)}
+            style={{
+              flex: 1, padding: '12px 8px',
+              borderRadius: 12, border: 'none',
+              background: type === key
+                ? `linear-gradient(135deg, ${color}22, ${color}11)`
+                : 'transparent',
+              color: type === key ? color : 'var(--text-muted)',
+              fontWeight: type === key ? 700 : 400,
+              fontSize: 15, cursor: 'pointer', fontFamily: 'inherit',
+              transition: 'all 0.2s',
+              boxShadow: type === key ? `0 0 0 1px ${color}40` : 'none'
+            }}
+          >
+            {label}
+          </motion.button>
+        ))}
       </div>
 
-      {/* Amount display */}
+      {/* Amount input */}
       <motion.div
         key={type}
         initial={{ opacity: 0, scale: 0.95 }}
@@ -121,40 +107,34 @@ export default function AddTransaction({ onTabChange }) {
           border: `1px solid ${accentColor}30`,
           borderRadius: 20,
           padding: '20px 24px',
-          textAlign: 'center'
         }}
       >
-        <div style={{ fontSize: 13, color: accentColor, opacity: 0.7, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, color: accentColor, opacity: 0.7, marginBottom: 10 }}>
           {isIncome ? 'Сумма дохода' : 'Сумма расхода'}
         </div>
-        <div style={{
-          fontSize: amount ? 42 : 36,
-          fontWeight: 800,
-          color: amount ? accentColor : 'var(--text-muted)',
-          letterSpacing: '-1px',
-          minHeight: 56,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 4
-        }}>
-          {amount ? (
-            <>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={amount}
-                  initial={{ opacity: 0.7, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.1 }}
-                >
-                  {formatDisplay(amount)}
-                </motion.span>
-              </AnimatePresence>
-              <span style={{ fontSize: 28 }}> ₽</span>
-            </>
-          ) : (
-            <span>0 ₽</span>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={handleAmountChange}
+            placeholder="0.00"
+            autoFocus
+            style={{
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              fontSize: 40,          /* >= 16px — зум не срабатывает */
+              fontWeight: 800,
+              color: amount ? accentColor : 'var(--text-muted)',
+              fontFamily: 'inherit',
+              letterSpacing: '-1px',
+              width: '100%',
+              caretColor: accentColor
+            }}
+          />
+          <span style={{ fontSize: 28, color: accentColor, fontWeight: 700, flexShrink: 0 }}>₽</span>
         </div>
         {error && (
           <motion.div
@@ -174,7 +154,7 @@ export default function AddTransaction({ onTabChange }) {
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 8,
-          maxHeight: 180,
+          maxHeight: 190,
           overflowY: 'auto'
         }}>
           {categories.map(cat => (
@@ -207,46 +187,15 @@ export default function AddTransaction({ onTabChange }) {
       </div>
 
       {/* Note */}
-      <div>
-        <input
-          ref={inputRef}
-          className="input"
-          placeholder="Заметка (необязательно)"
-          value={note}
-          onChange={e => setNote(e.target.value)}
-          maxLength={120}
-          style={{ fontSize: 14 }}
-        />
-      </div>
-
-      {/* Numpad */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 8
-      }}>
-        {['1','2','3','4','5','6','7','8','9','.','0','⌫'].map(key => (
-          <motion.button
-            key={key}
-            whileTap={{ scale: 0.9, backgroundColor: 'var(--bg-card-hover)' }}
-            onClick={() => key === '⌫' ? handleBackspace() : handleDigit(key)}
-            style={{
-              height: 52,
-              borderRadius: 14,
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              color: key === '⌫' ? '#FF5757' : 'var(--text-primary)',
-              fontSize: key === '⌫' ? 18 : 20,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
-          >
-            {key}
-          </motion.button>
-        ))}
-      </div>
+      <input
+        type="text"
+        className="input"
+        placeholder="Заметка (необязательно)"
+        value={note}
+        onChange={e => setNote(e.target.value)}
+        maxLength={120}
+        style={{ fontSize: 16 }}   /* 16px — зум не срабатывает */
+      />
 
       {/* Submit */}
       <AnimatePresence mode="wait">

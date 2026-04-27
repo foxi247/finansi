@@ -29,8 +29,6 @@ export default function App() {
     }
 
     const tgUser = tg?.initDataUnsafe?.user
-
-    // Dev fallback
     const mockUser = tgUser || { id: 123456789, first_name: 'Тест', username: 'testuser' }
     setTelegramUser(mockUser)
 
@@ -40,10 +38,7 @@ export default function App() {
       last_name: mockUser.last_name || null,
       username: mockUser.username || null
     })
-      .then(u => {
-        setUser(u)
-        setReady(true)
-      })
+      .then(u => { setUser(u); setReady(true) })
       .catch(err => {
         console.error('Init error:', err)
         setError('Не удалось подключиться к серверу')
@@ -53,7 +48,7 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100dvh', gap: 16 }}>
         <LoadingLogo />
         <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Загрузка Finansi...</p>
       </div>
@@ -62,7 +57,7 @@ export default function App() {
 
   if (error) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16, padding: 24, textAlign: 'center' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100dvh', gap: 16, padding: 24, textAlign: 'center' }}>
         <div style={{ fontSize: 48 }}>⚠️</div>
         <p style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{error}</p>
         <button className="btn btn-primary" onClick={() => window.location.reload()}>Попробовать снова</button>
@@ -70,26 +65,49 @@ export default function App() {
     )
   }
 
-  const pages = { home: Home, add: AddTransaction, analytics: Analytics, ai: AIChat }
-  const CurrentPage = pages[tab] || Home
+  const isAI = tab === 'ai'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
-      <div className="page-content">
+
+      {/* AI Chat — особый layout: занимает всё пространство, инпут прибит к низу */}
+      {isAI && (
         <AnimatePresence mode="wait">
           <motion.div
-            key={tab}
+            key="ai"
             variants={pageVariants}
             initial="initial"
             animate="animate"
             exit="exit"
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            style={{ minHeight: '100%' }}
+            style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}
           >
-            <CurrentPage onTabChange={setTab} user={user} />
+            <AIChat onTabChange={setTab} user={user} />
           </motion.div>
         </AnimatePresence>
-      </div>
+      )}
+
+      {/* Остальные страницы — обычный скролл */}
+      {!isAI && (
+        <div className="page-content">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              style={{ minHeight: '100%' }}
+            >
+              {tab === 'home' && <Home onTabChange={setTab} user={user} />}
+              {tab === 'add' && <AddTransaction onTabChange={setTab} user={user} />}
+              {tab === 'analytics' && <Analytics onTabChange={setTab} user={user} />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
+
       <BottomNav activeTab={tab} onTabChange={setTab} />
     </div>
   )

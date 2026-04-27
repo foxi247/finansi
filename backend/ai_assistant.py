@@ -3,7 +3,6 @@ import json
 import os
 from datetime import datetime
 
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
 MISTRAL_MODEL = "mistral-medium-latest"
 
@@ -49,11 +48,15 @@ async def chat_with_ai(message: str, user_summary: str, recent_transactions: str
         "max_tokens": 512
     }
 
+    api_key = os.getenv("MISTRAL_API_KEY", "")
+    if not api_key:
+        raise ValueError("MISTRAL_API_KEY не задан в .env файле")
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             f"{MISTRAL_BASE_URL}/chat/completions",
             headers={
-                "Authorization": f"Bearer {MISTRAL_API_KEY}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
             json=payload
