@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
@@ -5,6 +6,8 @@ from models import User, Transaction, Category
 from schemas import AIChatMessage, AIChatResponse
 from ai_assistant import chat_with_ai, build_user_summary
 from routes.transactions import get_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -28,7 +31,8 @@ async def ai_chat(
             recent_transactions=recent_tx
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"AI service error: {str(e)}")
+        logger.error(f"AI error [{type(e).__name__}]: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"[{type(e).__name__}] {str(e)}")
 
     if result.get("action") and result["action"]["type"] == "add_transaction":
         action_data = result["action"]["data"]
