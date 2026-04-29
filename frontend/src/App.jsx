@@ -5,7 +5,7 @@ import AddTransaction from './pages/AddTransaction'
 import Analytics from './pages/Analytics'
 import AIChat from './pages/AIChat'
 import BottomNav from './components/BottomNav'
-import { initUser, setTelegramUser } from './api/client'
+import { initUser, setTelegramUser, setTelegramData } from './api/client'
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
@@ -26,6 +26,8 @@ export default function App() {
       tg.expand()
       tg.setHeaderColor('#0B0B1A')
       tg.setBackgroundColor('#0B0B1A')
+      // Store initData for authenticated API calls
+      setTelegramData(tg)
     }
 
     const tgUser = tg?.initDataUnsafe?.user

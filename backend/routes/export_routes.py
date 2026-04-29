@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Transaction
-from routes.transactions import get_user
+from dependencies import get_current_user
 from datetime import datetime
 from typing import Optional
 import io
@@ -18,7 +18,7 @@ router = APIRouter()
 def export_excel(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
-    user: User = Depends(get_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     q = db.query(Transaction).filter(Transaction.user_id == user.id)

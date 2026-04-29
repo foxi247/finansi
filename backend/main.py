@@ -7,7 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from routes import users, transactions, categories, analytics, ai_chat, export_routes
 
-Base.metadata.create_all(bind=engine)
+# Create tables automatically unless running under pytest (tests manage their own schema)
+if not os.getenv("TESTING"):
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Finansi API", version="1.0.0")
 

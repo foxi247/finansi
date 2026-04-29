@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { sendAIMessage } from '../api/client'
+import { sendAIMessage, confirmAITransaction, createTransaction } from '../api/client'
 
 const SUGGESTIONS = [
   'Сколько я потратил за последние 7 дней?',
@@ -22,6 +22,8 @@ export default function AIChat() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  // Track which message ids have been confirmed or cancelled
+  const [confirmedIds, setConfirmedIds] = useState({})
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -58,6 +60,38 @@ export default function AIChat() {
     }
   }
 
+  const handleConfirm = async (msgId, actionData) => {
+    try {
+      // Try the dedicated /api/ai/confirm endpoint first, fall back to /api/transactions
+      const payload = {
+        type: actionData.type || 'expense',
+        amount: parseFloat(actionData.amount) || 0,
+        category_id: actionData.category_id || null,
+        note: actionData.note || null,
+      }
+      await confirmAITransaction(payload)
+      setConfirmedIds(prev => ({ ...prev, [msgId]: 'confirmed' }))
+    } catch (e) {
+      // Fallback: create directly
+      try {
+        const payload = {
+          type: actionData.type || 'expense',
+          amount: parseFloat(actionData.amount) || 0,
+          category_id: actionData.category_id || null,
+          note: actionData.note || null,
+        }
+        await createTransaction(payload)
+        setConfirmedIds(prev => ({ ...prev, [msgId]: 'confirmed' }))
+      } catch {
+        setConfirmedIds(prev => ({ ...prev, [msgId]: 'error' }))
+      }
+    }
+  }
+
+  const handleCancel = (msgId) => {
+    setConfirmedIds(prev => ({ ...prev, [msgId]: 'cancelled' }))
+  }
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -69,12 +103,12 @@ export default function AIChat() {
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100%',          /* заполняет всё выделенное пространство */
+      height: '100%',
       overflow: 'hidden',
       minHeight: 0
     }}>
 
-      {/* ── Шапка ── */}
+      {/* Header */}
       <div style={{
         padding: '16px 20px 12px',
         background: 'var(--bg-secondary)',
@@ -102,7 +136,7 @@ export default function AIChat() {
         </div>
       </div>
 
-      {/* ── Сообщения — скролл ── */}
+      {/* Messages scroll area */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
@@ -151,7 +185,21 @@ export default function AIChat() {
                 }}>
                   {msg.text}
                 </div>
-                {msg.action?.type === 'add_transaction' && (
+
+                {/* Confirmation card for AI transaction suggestions */}
+                {msg.role === 'assistant' &&
+                  msg.action?.type === 'add_transaction' &&
+                  msg.action?.requires_confirmation &&
+                  !confirmedIds[msg.id] && (
+                  <ConfirmationCard
+                    action={msg.action}
+                    onConfirm={() => handleConfirm(msg.id, msg.action.data)}
+                    onCancel={() => handleCancel(msg.id)}
+                  />
+                )}
+
+                {/* Confirmed state */}
+                {confirmedIds[msg.id] === 'confirmed' && msg.action?.type === 'add_transaction' && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -172,6 +220,35 @@ export default function AIChat() {
                     <span style={{ color: 'var(--text-muted)' }}>{msg.action.data.category}</span>
                   </motion.div>
                 )}
+
+                {/* Cancelled state */}
+                {confirmedIds[msg.id] === 'cancelled' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{
+                      marginTop: 6, fontSize: 12,
+                      color: 'var(--text-muted)', paddingLeft: 4
+                    }}
+                  >
+                    Отменено
+                  </motion.div>
+                )}
+
+                {/* Error state */}
+                {confirmedIds[msg.id] === 'error' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{
+                      marginTop: 6, fontSize: 12,
+                      color: '#FF5757', paddingLeft: 4
+                    }}
+                  >
+                    Ошибка при добавлении. Попробуйте снова.
+                  </motion.div>
+                )}
+
                 <div style={{
                   fontSize: 10, color: 'var(--text-muted)',
                   marginTop: 4,
@@ -186,7 +263,7 @@ export default function AIChat() {
           ))}
         </AnimatePresence>
 
-        {/* Индикатор печати */}
+        {/* Typing indicator */}
         {loading && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -219,7 +296,7 @@ export default function AIChat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Подсказки ── */}
+      {/* Suggestion chips */}
       <AnimatePresence>
         {messages.length <= 2 && !loading && (
           <motion.div
@@ -257,7 +334,7 @@ export default function AIChat() {
         )}
       </AnimatePresence>
 
-      {/* ── Инпут — прибит к низу ── */}
+      {/* Input bar */}
       <div style={{
         flexShrink: 0,
         padding: '10px 14px',
@@ -280,7 +357,7 @@ export default function AIChat() {
             padding: '12px 16px',
             color: 'var(--text-primary)',
             fontFamily: 'inherit',
-            fontSize: 16,       /* >= 16px — зум не срабатывает */
+            fontSize: 16,
             outline: 'none',
             resize: 'none',
             maxHeight: 100,
@@ -316,6 +393,87 @@ export default function AIChat() {
         </motion.button>
       </div>
     </div>
+  )
+}
+
+function ConfirmationCard({ action, onConfirm, onCancel }) {
+  const data = action?.data || {}
+  const isIncome = data.type === 'income'
+  const accentColor = isIncome ? '#10D9A0' : '#FF5757'
+  const accentBg = isIncome ? 'rgba(16,217,160,0.08)' : 'rgba(255,87,87,0.08)'
+  const accentBorder = isIncome ? 'rgba(16,217,160,0.25)' : 'rgba(255,87,87,0.25)'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.2 }}
+      style={{
+        marginTop: 8,
+        background: accentBg,
+        border: `1px solid ${accentBorder}`,
+        borderRadius: 14,
+        padding: '12px 14px',
+        fontSize: 13
+      }}
+    >
+      <div style={{ fontWeight: 600, color: accentColor, marginBottom: 8 }}>
+        {isIncome ? '💰 Подтвердить доход?' : '💸 Подтвердить расход?'}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12, color: 'var(--text-secondary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>Сумма</span>
+          <span style={{ fontWeight: 700, color: accentColor }}>
+            {new Intl.NumberFormat('ru-RU').format(data.amount)} ₽
+          </span>
+        </div>
+        {data.category && (
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Категория</span>
+            <span style={{ color: 'var(--text-primary)' }}>{data.category}</span>
+          </div>
+        )}
+        {data.note && (
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Заметка</span>
+            <span style={{ color: 'var(--text-primary)' }}>{data.note}</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={onConfirm}
+          style={{
+            flex: 1, padding: '9px 8px',
+            borderRadius: 10, border: 'none',
+            background: accentColor,
+            color: 'white',
+            fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'inherit'
+          }}
+        >
+          Добавить ✅
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={onCancel}
+          style={{
+            flex: 1, padding: '9px 8px',
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+            background: 'var(--bg-card)',
+            color: 'var(--text-muted)',
+            fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'inherit'
+          }}
+        >
+          Отмена ❌
+        </motion.button>
+      </div>
+    </motion.div>
   )
 }
 

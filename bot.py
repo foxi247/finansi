@@ -6,7 +6,10 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8571456692:AAHfA98B-z9Y18mDm-gP9jmpI9Wq6Xw5fZg")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise SystemExit("ERROR: BOT_TOKEN not set in .env file")
+
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://YOUR_FRONTEND_URL")
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)

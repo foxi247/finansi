@@ -4,10 +4,17 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 let telegramUserId = null
 let telegramUser = null
+let initData = null
 
 export function setTelegramUser(user) {
   telegramUser = user
   telegramUserId = String(user.id)
+}
+
+export function setTelegramData(tgApp) {
+  if (tgApp?.initData) {
+    initData = tgApp.initData
+  }
 }
 
 export function getTelegramUserId() {
@@ -24,11 +31,15 @@ api.interceptors.request.use(config => {
 })
 
 // Users
-export const initUser = (data) => api.post('/users/init', data).then(r => r.data)
+export const initUser = (data) => api.post('/users/init', {
+  init_data: initData || undefined,
+  ...data  // fallback fields for dev mode
+}).then(r => r.data)
 
 // Transactions
 export const getTransactions = (params = {}) => api.get('/transactions', { params }).then(r => r.data)
 export const createTransaction = (data) => api.post('/transactions', data).then(r => r.data)
+export const updateTransaction = (id, data) => api.patch(`/transactions/${id}`, data).then(r => r.data)
 export const deleteTransaction = (id) => api.delete(`/transactions/${id}`).then(r => r.data)
 
 // Categories
@@ -41,6 +52,7 @@ export const getTrend = (days = 30) => api.get('/analytics/trend', { params: { d
 
 // AI Chat
 export const sendAIMessage = (message) => api.post('/ai/chat', { message }).then(r => r.data)
+export const confirmAITransaction = (data) => api.post('/ai/confirm', data).then(r => r.data)
 
 // Export
 export const getExcelUrl = (params = {}) => {
@@ -59,7 +71,7 @@ export const downloadExcel = async (params = {}) => {
   const url = window.URL.createObjectURL(new Blob([resp.data]))
   const a = document.createElement('a')
   a.href = url
-  a.download = `finansi_${new Date().toISOString().slice(0,10)}.xlsx`
+  a.download = `finansi_${new Date().toISOString().slice(0, 10)}.xlsx`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
