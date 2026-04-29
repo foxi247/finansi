@@ -1,17 +1,27 @@
 from dotenv import load_dotenv
 load_dotenv()  # must be before all other imports so env vars are available
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from routes import users, transactions, categories, analytics, ai_chat, export_routes
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Finansi API", version="1.0.0")
 
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+
+if DEV_MODE or not cors_origins_env:
+    cors_origins = ["*"]
+else:
+    cors_origins = [o.strip() for o in cors_origins_env.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

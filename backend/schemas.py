@@ -46,6 +46,13 @@ class TransactionCreate(BaseModel):
     date: Optional[datetime] = None
 
 
+class TransactionUpdate(BaseModel):
+    amount: Optional[float] = None
+    note: Optional[str] = None
+    category_id: Optional[int] = None
+    date: Optional[datetime] = None
+
+
 class TransactionOut(BaseModel):
     id: int
     type: str
@@ -64,4 +71,4 @@ class AIChatMessage(BaseModel):
 
 class AIChatResponse(BaseModel):
     reply: str
-    action: Optional[dict] = None  # {"type": "add_transaction", "data": {...}}
+    action: Optional[dict] = None  # {"type": "add_transaction", "data": {...}, "requires_confirmation": True}

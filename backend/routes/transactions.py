@@ -1,27 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 from database import get_db
 from models import Transaction, User, Category
-from schemas import TransactionCreate, TransactionOut
-from routes.users import get_or_create_user
+from schemas import TransactionCreate, TransactionOut, TransactionUpdate
+from dependencies import get_current_user
 from datetime import datetime
 from typing import Optional, List
 
 router = APIRouter()
 
 
-def get_user(x_telegram_user_id: str = Header(...), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.telegram_id == x_telegram_user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found. Call /api/users/init first.")
-    return user
-
-
 @router.post("", response_model=TransactionOut)
 def create_transaction(
     data: TransactionCreate,
-    user: User = Depends(get_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     if data.type not in ("income", "expense"):
@@ -60,7 +52,7 @@ def list_transactions(
     category_id: Optional[int] = None,
     limit: int = Query(50, le=200),
     offset: int = 0,
-    user: User = Depends(get_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     q = db.query(Transaction).filter(Transaction.user_id == user.id)
@@ -76,10 +68,49 @@ def list_transactions(
     return q.order_by(Transaction.date.desc()).offset(offset).limit(limit).all()
 
 
+@router.patch("/{tx_id}", response_model=TransactionOut)
+def update_transaction(
+    tx_id: int,
+    data: TransactionUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    tx = db.query(Transaction).filter(
+        Transaction.id == tx_id,
+        Transaction.user_id == user.id
+    ).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if data.amount is not None:
+        if data.amount <= 0:
+            raise HTTPException(status_code=400, detail="amount must be positive")
+        tx.amount = data.amount
+
+    if data.note is not None:
+        tx.note = data.note
+
+    if data.date is not None:
+        tx.date = data.date
+
+    if data.category_id is not None:
+        category = db.query(Category).filter(
+            Category.id == data.category_id,
+            Category.user_id == user.id
+        ).first()
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        tx.category_id = data.category_id
+
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
 @router.delete("/{tx_id}")
 def delete_transaction(
     tx_id: int,
-    user: User = Depends(get_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     tx = db.query(Transaction).filter(

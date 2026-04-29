@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from database import get_db
 from models import User, Transaction, Category
+from dependencies import get_current_user
 from datetime import datetime, timedelta
 from typing import Optional
 from collections import defaultdict
@@ -10,18 +10,11 @@ from collections import defaultdict
 router = APIRouter()
 
 
-def get_user(x_telegram_user_id: str = Header(...), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.telegram_id == x_telegram_user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-
 @router.get("/summary")
 def get_summary(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
-    user: User = Depends(get_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     q = db.query(Transaction).filter(Transaction.user_id == user.id)
@@ -31,8 +24,8 @@ def get_summary(
         q = q.filter(Transaction.date <= date_to)
 
     transactions = q.all()
-    total_income = sum(t.amount for t in transactions if t.type == "income")
-    total_expense = sum(t.amount for t in transactions if t.type == "expense")
+    total_income = sum(float(t.amount) for t in transactions if t.type == "income")
+    total_expense = sum(float(t.amount) for t in transactions if t.type == "expense")
 
     return {
         "total_income": total_income,
@@ -47,7 +40,7 @@ def get_by_category(
     type: str = "expense",
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
-    user: User = Depends(get_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     q = db.query(Transaction).filter(
@@ -66,7 +59,7 @@ def get_by_category(
         name = t.category.name if t.category else "Без категории"
         icon = t.category.icon if t.category else "❓"
         color = t.category.color if t.category else "#AEB6BF"
-        category_totals[name]["amount"] += t.amount
+        category_totals[name]["amount"] += float(t.amount)
         category_totals[name]["count"] += 1
         category_totals[name]["icon"] = icon
         category_totals[name]["color"] = color
@@ -89,7 +82,7 @@ def get_by_category(
 @router.get("/trend")
 def get_trend(
     days: int = Query(30, le=365),
-    user: User = Depends(get_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     date_from = datetime.utcnow() - timedelta(days=days)
@@ -101,7 +94,7 @@ def get_trend(
     daily = defaultdict(lambda: {"income": 0, "expense": 0})
     for t in transactions:
         day = t.date.strftime("%Y-%m-%d")
-        daily[day][t.type] += t.amount
+        daily[day][t.type] += float(t.amount)
 
     result = []
     for i in range(days):

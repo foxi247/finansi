@@ -1,8 +1,12 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 from database import get_db
 from models import User, Category
-from schemas import UserCreate, UserOut
+from schemas import UserOut
+from auth import validate_telegram_init_data
 
 router = APIRouter()
 
@@ -51,13 +55,50 @@ def get_or_create_user(telegram_id: str, db: Session, first_name=None, last_name
     return user
 
 
+class UserInit(BaseModel):
+    init_data: Optional[str] = None  # Telegram WebApp initData
+    # Fallback for dev mode only
+    telegram_id: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+
+
 @router.post("/init", response_model=UserOut)
-def init_user(data: UserCreate, db: Session = Depends(get_db)):
+def init_user(data: UserInit, db: Session = Depends(get_db)):
+    dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
+
+    if data.init_data:
+        tg_user = validate_telegram_init_data(data.init_data)
+        if not tg_user and not dev_mode:
+            raise HTTPException(status_code=401, detail="Invalid Telegram initData")
+        if tg_user:
+            telegram_id = str(tg_user.get("id"))
+            first_name = tg_user.get("first_name")
+            username = tg_user.get("username")
+            last_name = tg_user.get("last_name")
+        else:
+            # dev mode: validation failed but allowed
+            telegram_id = data.telegram_id or "dev_user"
+            first_name = data.first_name
+            username = data.username
+            last_name = data.last_name
+    elif dev_mode and data.telegram_id:
+        telegram_id = data.telegram_id
+        first_name = data.first_name
+        username = data.username
+        last_name = data.last_name
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="init_data required (or DEV_MODE=true with telegram_id)"
+        )
+
     user = get_or_create_user(
-        telegram_id=data.telegram_id,
-        db=db,
-        first_name=data.first_name,
-        last_name=data.last_name,
-        username=data.username
+        telegram_id,
+        db,
+        first_name=first_name,
+        last_name=last_name,
+        username=username
     )
     return user
